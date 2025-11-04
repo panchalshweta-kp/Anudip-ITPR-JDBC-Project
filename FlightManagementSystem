@@ -1,0 +1,154 @@
+import java.sql.*;
+import java.util.Scanner;
+
+public class FlightManagementSystem {
+    public static void main(String[] args) {
+        String url = "jdbc:mysql://localhost:3306/flightdb";
+        String user = "root";
+        String pass = "12345"; // your MySQL password
+
+        Scanner sc = new Scanner(System.in);
+
+        try {
+            Class.forName("com.mysql.cj.jdbc.Driver");
+            Connection con = DriverManager.getConnection(url, user, pass);
+            System.out.println("✅ Connected to Flight Database!");
+
+            while (true) {
+                System.out.println("\n=== FLIGHT MANAGEMENT MENU ===");
+                System.out.println("1. Add Flight");
+                System.out.println("2. Add Passenger");
+                System.out.println("3. Book Flight");
+                System.out.println("4. View Bookings");
+                System.out.println("5. Exit");
+                System.out.print("Enter choice: ");
+                int choice = sc.nextInt();
+
+                switch (choice) {
+                    case 1:
+                        // ➕ Add Flight
+                        System.out.print("Enter Flight ID: ");
+                        int fid = sc.nextInt();
+                        sc.nextLine();
+                        System.out.print("Enter Flight Name: ");
+                        String fname = sc.nextLine();
+                        System.out.print("Enter Source: ");
+                        String source = sc.nextLine();
+                        System.out.print("Enter Destination: ");
+                        String dest = sc.nextLine();
+                        System.out.print("Enter Total Seats: ");
+                        int seats = sc.nextInt();
+
+                        PreparedStatement ps1 = con.prepareStatement("INSERT INTO flights VALUES (?, ?, ?, ?, ?)");
+                        ps1.setInt(1, fid);
+                        ps1.setString(2, fname);
+                        ps1.setString(3, source);
+                        ps1.setString(4, dest);
+                        ps1.setInt(5, seats);
+                        ps1.executeUpdate();
+                        ps1.close();
+                        System.out.println("✅ Flight added successfully!");
+                        break;
+
+                    case 2:
+                        // 👤 Add Passenger
+                        System.out.print("Enter Passenger ID: ");
+                        int pid = sc.nextInt();
+                        sc.nextLine();
+                        System.out.print("Enter Name: ");
+                        String pname = sc.nextLine();
+                        System.out.print("Enter Age: ");
+                        int age = sc.nextInt();
+
+                        PreparedStatement ps2 = con.prepareStatement("INSERT INTO passengers VALUES (?, ?, ?)");
+                        ps2.setInt(1, pid);
+                        ps2.setString(2, pname);
+                        ps2.setInt(3, age);
+                        ps2.executeUpdate();
+                        ps2.close();
+                        System.out.println("✅ Passenger added successfully!");
+                        break;
+
+                    case 3:
+                        // 🎟️ Book Flight
+                        System.out.print("Enter Flight ID: ");
+                        int bf_id = sc.nextInt();
+                        System.out.print("Enter Passenger ID: ");
+                        int bp_id = sc.nextInt();
+                        System.out.print("Enter Seats to Book: ");
+                        int booked = sc.nextInt();
+
+                        // Check seat availability
+                        PreparedStatement check = con.prepareStatement("SELECT seats FROM flights WHERE flight_id=?");
+                        check.setInt(1, bf_id);
+                        ResultSet rs = check.executeQuery();
+
+                        if (rs.next()) {
+                            int available = rs.getInt("seats");
+                            if (available >= booked) {
+                                // Proceed with booking
+                                PreparedStatement ps3 = con.prepareStatement(
+                                        "INSERT INTO bookings (flight_id, passenger_id, seats_booked) VALUES (?, ?, ?)");
+                                ps3.setInt(1, bf_id);
+                                ps3.setInt(2, bp_id);
+                                ps3.setInt(3, booked);
+                                ps3.executeUpdate();
+
+                                // Update seat count
+                                PreparedStatement updateSeats = con.prepareStatement(
+                                        "UPDATE flights SET seats = seats - ? WHERE flight_id=?");
+                                updateSeats.setInt(1, booked);
+                                updateSeats.setInt(2, bf_id);
+                                updateSeats.executeUpdate();
+
+                                ps3.close();
+                                updateSeats.close();
+                                System.out.println("✅ Flight booked successfully!");
+                            } else {
+                                System.out.println("❌ Not enough seats available!");
+                            }
+                        } else {
+                            System.out.println("❌ Flight not found!");
+                        }
+                        rs.close();
+                        check.close();
+                        break;
+
+                    case 4:
+                        // 📋 View All Bookings
+                        String query = """
+                            SELECT b.booking_id, f.flight_name, p.name, b.seats_booked
+                            FROM bookings b
+                            JOIN flights f ON b.flight_id = f.flight_id
+                            JOIN passengers p ON b.passenger_id = p.passenger_id
+                            """;
+                        Statement stmt = con.createStatement();
+                        ResultSet result = stmt.executeQuery(query);
+                        System.out.println("\nBookingID\tFlight\tPassenger\tSeats");
+                        System.out.println("-----------------------------------------");
+                        while (result.next()) {
+                            System.out.println(result.getInt(1) + "\t" + result.getString(2) + "\t" +
+                                               result.getString(3) + "\t" + result.getInt(4));
+                        }
+                        result.close();
+                        stmt.close();
+                        break;
+
+                    case 5:
+                        System.out.println("👋 Exiting...");
+                        con.close();
+                        sc.close();
+                        System.exit(0);
+                        break;
+
+                    default:
+                        System.out.println("❌ Invalid choice!");
+                }
+            }
+
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+}
+
